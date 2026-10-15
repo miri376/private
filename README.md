@@ -1,0 +1,87 @@
+# Kilid — Android versiyası
+
+Seçdiyiniz tətbiqlər açılanda **Kilid ekranı** çıxır; PIN və ya barmaq izi/üz ilə təsdiq edib 15, 30 və ya 60 dəqiqəlik açırsınız. Gecə saatları kimi vaxtlarda avtomatik bloklama üçün cədvəllər də var. Bütün interfeys Azərbaycan dilindədir (açıq/tünd/sistem mövzusu).
+
+> **Status (dürüst):** kod yazılıb, lakin **hələ heç vaxt kompilyasiya edilməyib, test edilməyib və telefonda işə salınmayıb**. Yazdığım mühitdə Android SDK yox idi və Google/Maven saytları bloklanmışdı. Ona görə ilk build-də kiçik xətalar çıxa bilər; çıxsa, mətni mənə göndərin, düzəldərəm.
+
+## Bu necə işləyir
+
+Android-də iOS-dakı kimi hazır "shield" yoxdur. Kilid belə işləyir:
+
+1. Ön planda işləyən xidmət (`MonitorService`) təxminən hər 0,6 saniyədə hansı tətbiqin ön planda olduğuna baxır (`UsageStatsManager`).
+2. Seçilmiş tətbiq ön plana çıxsa və qayda aktivdirsə, Kilid ekranı (`LockActivity`) həmin tətbiqin üstündə açılır.
+3. PIN/biometrik uğurlu olarsa, yalnız **həmin tətbiq** seçilmiş müddətə açılır. Müddət bitəndə xidmət növbəti yoxlamada yenidən kilid ekranı göstərir (bitmə vaxtı saxlanır, tətbiqin açıq qalmasına bağlı deyil).
+
+Niyə "Əlçatanlıq xidməti" (Accessibility) istifadə etmirik? Çünki bu, Google Play-də sərt məhdudiyyətlərə tabedir və həssas icazədir. Seçdiyimiz yol daha az icazə istəyir, lakin bir qədər gec reaksiya verir.
+
+## Real məhdudiyyətlər (xahiş edirəm oxuyun)
+
+- **Keçilməz deyil.** Telefonun sahibi icazələri geri ala, xidməti "Force stop" edə, tətbiqi silə, təhlükəsiz rejimə keçə bilər. Kilid uninstall-dan qoruma vermir (bunun üçün Device Admin lazımdır, bu MVP-yə daxil edilməyib). Parametrlər tətbiqini də bloklamaq istəyirsinizsə, siyahıdan özünüz seçin.
+- **Reaksiya gecikməsi.** Bloklanmış tətbiq bir saniyəlik görünüb sonra kilid ekranı çıxa bilər.
+- **Telefon istehsalçıları** (Xiaomi, Huawei, Samsung, Oppo və s.) fon xidmətlərini dayandıra bilər. Tətbiqdə "Batareya məhdudiyyətini söndür" icazəsini verin; lazım olsa telefonun "Autostart"/"Protected apps" ayarından Kilid-ə icazə verin.
+- Bildiriş icazəsi verilməsə də xidmət işləyir, amma sistem bildirişi görünməyə bilər.
+- Cədvəllər **telefonun saatına** əsaslanır; saatı əl ilə dəyişən birisi onları aldada bilər.
+- Biometrik giriş telefondakı **istənilən** qeydə alınmış barmaq izi/üzü qəbul edir (iOS versiyasındakı kimi yeni biometrik əlavəsini aşkar etmir). PIN həmişə əsasdır.
+- PIN unudulubsa: gizli master PIN yoxdur. Telefonun öz ekran kilidi ilə təsdiq edib yeni PIN yaradırsınız (telefon ekran kilidini bilən hər kəs bunu edə bilər).
+- `FLAG_SECURE` səbəbindən Kilid ekranının skrinşotu çəkilmir; bu, nəzərdə tutulub.
+- Google Play-ə yükləmək üçün ayrıca siyasət yoxlaması lazımdır (istifadə statistikası və üstündə göstərmə icazələri). Bu layihə APK ilə birbaşa quraşdırma üçündür və Play təsdiqinə zəmanət verilmir.
+
+## APK-nı Mac və Android Studio olmadan çıxarmaq (GitHub ilə)
+
+Kompüterinizdə yalnız brauzer lazımdır. GitHub bizim yerimizə bulud kompüterində build edir.
+
+1. [github.com](https://github.com) saytında pulsuz hesab açın.
+2. Sağ yuxarıda **+ → New repository**. Ad: `kilid`. **Private** seçin. **Create repository** basın.
+3. `KilidAndroid.zip` faylını kompüterdə açın (Extract).
+4. Yeni repozitoriya səhifəsində **uploading an existing file** linkinə basın. Açdığınız qovluğun **içindəki hər şeyi** (`app`, `.github`, `build.gradle.kts`, `settings.gradle.kts`, `gradle.properties`, `README.md`) pəncərəyə sürükləyin. Aşağıda **Commit changes** basın.
+   - Əgər `.github` qovluğu yüklənməyibsə: **Add file → Create new file** basın, ad xanasına `.github/workflows/build-apk.yml` yazın (yazanda `/` qovluq yaradır) və `build-apk.yml` faylının məzmununu içinə yapışdırıb **Commit** edin.
+5. Üstdəki **Actions** sekmesinə keçin. Düymə çıxsa "I understand my workflows, go ahead and enable them" basın.
+6. Solda **Build APK** seçin → sağda **Run workflow** → yaşıl **Run workflow**.
+7. 5–10 dəqiqə gözləyin. Yaşıl ✓ çıxsa, həmin işə klikləyin, ən aşağıda **Artifacts** altında **kilid-debug-apk** faylını endirin. Zip-i açın; içində `app-debug.apk` var.
+   - Qırmızı ✗ çıxsa, işə klikləyin, qırmızı addımı açın və xəta mətnini mənə göndərin.
+8. APK-nı telefonunuza göndərin (kabel, Telegram, Google Drive) və açın. Android "Naməlum mənbələrdən quraşdırma" icazəsi istəyəcək; verin. Google Play Protect xəbərdarlıq edərsə **Yenə də quraşdır** seçin (tətbiq Play-dən deyil, sizin özünüzdür).
+
+Alternativ: Windows-da **Android Studio** quraşdırın, qovluğu açın, **Build → Build APK(s)** seçin.
+
+## İlk açılış
+
+PIN yaradın → (istəsəniz) biometrik → iki məcburi icazə: **İstifadə statistikası** və **Digər tətbiqlərin üstündə göstər**. Hər düymə sizi uyğun Android ekranına aparır; orada **Kilid**-i tapıb icazəni açın və geri qayıdın → bloklanacaq tətbiqləri seçin.
+
+## Real telefonda yoxlama siyahısı
+
+| # | Yoxlama | Gözlənilən |
+|---|---------|-----------|
+| 1 | Onboarding, PIN yaratma | PIN təkrarı uyğun gəlməsə yenidən başlayır |
+| 2 | İcazələr verilmədən "İndi kilidlə" | Aydın xəta, məhdudiyyət "aktiv" göstərilmir |
+| 3 | Tətbiq seçib "İndi kilidlə", həmin tətbiqi aç | Kilid ekranı çıxır |
+| 4 | Səhv PIN ×5 | 30 san gecikmə, klaviatura bloklanır |
+| 5 | Biometrik ləğv/uğursuz | Açılmır, PIN qalır |
+| 6 | 15 dəq açma, gözlə | Müddət bitəndə yenidən kilid ekranı (gecikmə ola bilər) |
+| 7 | Açıq tətbiqin içində müddət bitir | Növbəti yoxlamada kilid ekranı üstünə çıxır |
+| 8 | Geri düyməsi kilid ekranında | Ana ekrana qayıdır, tətbiq açılmır |
+| 9 | Cədvəl (məs. 5 dəq sonra başlayan) | Başlama anında bloklama; bitəndə götürülür |
+| 10 | Gecə yarısını keçən və üst-üstə düşən cədvəllər | Biri bitəndə digərinin bloklaması qalır |
+| 11 | Telefonu yenidən başlat | Xidmət bərpa olunur (istehsalçıdan asılıdır) |
+| 12 | Tətbiqi son tətbiqlərdən sil | Xidmət işləməyə davam edir (istehsalçıdan asılıdır) |
+| 13 | Saat qurşağı dəyişikliyi | Cədvəllər yeni yerli saata görə işləyir |
+| 14 | PIN unutdum | Ekran kilidi ilə təsdiq → yeni PIN |
+| 15 | Sıfırlama | PIN, seçim, cədvəl silinir, xidmət dayanır |
+
+## Avtomatik testlər
+
+`app/src/test/.../KilidTests.kt`: vaxt riyaziyyatı (gecə yarısını keçən, bazar→bazar ertəsi), siyasət (üst-üstə düşən cədvəllər, müvəqqəti açma, əl ilə kilid), PIN kriptoqrafiyası və gecikmə cədvəli. GitHub workflow bu testləri build-dən əvvəl avtomatik işlədir. Testlər hələ heç vaxt icra olunmayıb.
+
+## Fayl strukturu
+
+```
+app/src/main/java/az/kilid/app/
+├── MainActivity.kt, LockActivity.kt, KilidViewModel.kt
+├── data/      Models (cədvəl + vaxt riyaziyyatı), Policy (vahid siyasət), KilidRepository (lokal saxlanma)
+├── security/  PinManager (Keystore ilə şifrələnmiş PIN), PinCrypto (PBKDF2), Biometrics
+├── service/   MonitorService (ön plan izləmə), BootReceiver, Permissions
+└── ui/        Onboarding, MainScreens (Ana səhifə/Tətbiqlər/Cədvəllər/Parametrlər), PinUi, Common, Theme
+```
+
+## Yoxlanılmayanlar (cəmi)
+
+Kompilyasiya, unit testlərin icrası, real telefonda bütün yuxarıdakı ssenarilər, Compose görünüşünün düzgünlüyü, TalkBack davranışı, müxtəlif istehsalçılarda fon xidmətinin sağ qalması, Android 14/15-də ön plan xidməti davranışı və kilid ekranının başqa tətbiqin üstündə açılması (üstündə göstərmə icazəsi ilə).
